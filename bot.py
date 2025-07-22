@@ -153,9 +153,12 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
 async def show_user_menu(message: types.Message):
     welcome_text = (
-        "Добро пожаловать в кафе «Кацулька» 💗\n\n"
+        "Добро пожаловать в кафе «Кацулька» 💗\n"
+        "\n"
         "В нашем заведении подают только горячие блюда, как и Вы 🔥\n"
-        "Главный шеф-повар и по совместительству владелица кафе - заМУРРРчательная Виктория 🩷\n"
+        "\n"
+        "Главный шеф-повар и по совместительству владелица кафе - заМУРРРчательная Виктория 💗\n"
+        "\n"
         "Заранее предупреждаем, оплата у нас необычная, приятного аппетита 🫶🏻"
     )
     
@@ -254,21 +257,37 @@ async def handle_special_category(call: types.CallbackQuery, category: str):
                 "Мне не описать эту боль….да кого я обманываю?\n"
                 "Едем!\n"
                 "Я пока меняю фартук на наряд, ты подыскивай место 😍\n"
-                "Оплата: комплимент от шеф-повара 1 страстный поцелуй и любое желание hot 🔥🔞"
+                "Оплата: комплимент от шеф-повара - 1 страстный поцелуй и любое желание hot 🔥🔞"
             )
             photo_path = str(PHOTOS_DIR / 'outdoor.jpg')
-            
+    
             builder = InlineKeyboardBuilder()
             builder.add(types.InlineKeyboardButton(
                 text="⬅️ Назад",
                 callback_data="categories"
             ))
-            
+    
+    # Отправляем сообщение пользователю
             await call.message.answer_photo(
                 FSInputFile(photo_path),
                 caption=text,
                 reply_markup=builder.as_markup()
             )
+    
+    # Уведомление админу с кнопкой
+            if ADMIN_ID:
+                admin_builder = InlineKeyboardBuilder()
+                admin_builder.add(types.InlineKeyboardButton(
+                    text="🟢 Погнали!",
+                    callback_data=f"outdoor_confirm_{call.from_user.id}"
+                ))
+        
+                await bot.send_message(
+                    ADMIN_ID,
+                    f"🍽 Кто-то хочет по ресторанам!\n",
+                    reply_markup=admin_builder.as_markup()
+                )
+
             
         elif category == 'delivery':
             text = (
@@ -366,23 +385,30 @@ async def delivery_continue_handler(call: types.CallbackQuery):
         logger.error(f"Ошибка в delivery_continue: {e}")
         await call.answer("❌ Ошибка загрузки, попробуйте позже")
 
-@dp.callback_query(F.data.startswith("delivery_"))
+@dp.callback_query(F.data.startswith("delivery_") & ~F.data.startswith("delivery_confirm_"))
 async def delivery_final(call: types.CallbackQuery):
     try:
         # Отправляем финальную картинку пользователю
         await call.message.answer_photo(
             FSInputFile(PHOTOS_DIR / 'nedoljno.jpg'),
-            caption="Оплата: комплимент от шеф-повара 10 чмоков и минетик 👄🔞",
+            caption="Оплата: комплимент от шеф-повара - 10 чмоков и минетик 👄🔞",
             reply_markup=InlineKeyboardBuilder()
                 .button(text="🍽 В меню", callback_data="categories")
                 .as_markup()
         )
         
-        # Простое уведомление админу
+        # Уведомление админу с кнопкой
         if ADMIN_ID:
+            builder = InlineKeyboardBuilder()
+            builder.add(types.InlineKeyboardButton(
+                text="🟢 Отлично!",
+                callback_data=f"delivery_confirm_{call.from_user.id}"
+            ))
+            
             await bot.send_message(
                 ADMIN_ID,
-                "🚚 Кто-то хочет доставку!"
+                f"🚚 Кто-то хочет доставку!\n",
+                reply_markup=builder.as_markup()
             )
             
     except Exception as e:
@@ -432,7 +458,7 @@ async def compote_handler(call: types.CallbackQuery):
         await call.message.edit_reply_markup(reply_markup=None)
         
         # Ждем 4 секунды
-        await asyncio.sleep(4)
+        await asyncio.sleep(2)
         
         # Отправляем картинку пользователю
         await call.message.answer_photo(
@@ -443,13 +469,18 @@ async def compote_handler(call: types.CallbackQuery):
                 .as_markup()
         )
         
-        # Уведомление админу
+        # Уведомление админу с кнопкой
         if ADMIN_ID:
-            user = call.from_user
+            builder = InlineKeyboardBuilder()
+            builder.add(types.InlineKeyboardButton(
+                text="🍻 Давай нахуяримся!",
+                callback_data=f"compote_confirm_{call.from_user.id}"
+            ))
+            
             await bot.send_message(
                 ADMIN_ID,
-                "🌳 Кто-то хочет в дрова!"
-               
+                f"🌳 Кто-то хочет в дрова!\n",
+                reply_markup=builder.as_markup()
             )
             
     except Exception as e:
@@ -480,6 +511,36 @@ async def shawarma_handler(call: types.CallbackQuery):
         logger.error(f"Ошибка в shawarma_handler: {e}")
         await call.answer("❌ Шаурма закончилась...")
 
+@dp.callback_query(F.data == "bichis_shawarma")
+async def shawarma_handler(call: types.CallbackQuery):
+    try:
+        # Отправляем шаурму пользователю
+        await call.message.answer_photo(
+            FSInputFile(PHOTOS_DIR / 'shawarma.jpg'),
+            caption="Че смотришь? Одевайся, идём за шавухой.\nОплата: 1 обнимашка 🤗",
+            reply_markup=InlineKeyboardBuilder()
+                .button(text="🍽 В меню", callback_data="categories")
+                .as_markup()
+        )
+        
+        # Уведомление админу с кнопкой
+        if ADMIN_ID:
+            builder = InlineKeyboardBuilder()
+            builder.add(types.InlineKeyboardButton(
+                text="🟢 Сифооооон!",
+                callback_data=f"bichis_confirm_{call.from_user.id}_shawarma"
+            ))
+            
+            await bot.send_message(
+                ADMIN_ID,
+                f"🥙 Кто-то хочет шавуху!\n",
+                reply_markup=builder.as_markup()
+            )
+            
+    except Exception as e:
+        logger.error(f"Ошибка в shawarma_handler: {e}")
+        await call.answer("❌ Шаурма закончилась...")
+
 @dp.callback_query(F.data == "bichis_doshik")
 async def doshik_handler(call: types.CallbackQuery):
     try:
@@ -492,12 +553,18 @@ async def doshik_handler(call: types.CallbackQuery):
                 .as_markup()
         )
         
-        # Уведомление админу
+        # Уведомление админу с кнопкой
         if ADMIN_ID:
-            user = call.from_user
+            builder = InlineKeyboardBuilder()
+            builder.add(types.InlineKeyboardButton(
+                text="🟢 Сифооооон!",
+                callback_data=f"bichis_confirm_{call.from_user.id}_doshik"
+            ))
+            
             await bot.send_message(
                 ADMIN_ID,
-                "🍜 Кто-то хочет дошик!"
+                f"🍜 Кто-то хочет дошик!\n",
+                reply_markup=builder.as_markup()
             )
             
     except Exception as e:
@@ -524,31 +591,52 @@ async def process_guests_count(message: types.Message, state: FSMContext):
     
     await state.update_data(guests_count=int(message.text))
     
-    builder = ReplyKeyboardBuilder()
+    # Создаем inline-клавиатуру
+    builder = InlineKeyboardBuilder()
     builder.row(
-        KeyboardButton(text="Можно и по дошику"),
-        KeyboardButton(text="Норм по домашнему")
+        types.InlineKeyboardButton(
+            text="Можно и по дошику",
+            callback_data="banquet_level_doshik"
+        ),
+        types.InlineKeyboardButton(
+            text="Норм по домашнему",
+            callback_data="banquet_level_home"
+        )
     )
-    builder.row(KeyboardButton(text="Тяжелый люкс"))
+    builder.row(
+        types.InlineKeyboardButton(
+            text="Тяжелый люкс",
+            callback_data="banquet_level_lux"
+        )
+    )
     
     await message.answer(
         "Выберите уровень сложности готовки:",
-        reply_markup=builder.as_markup(resize_keyboard=True)
+        reply_markup=builder.as_markup()
     )
     await state.set_state(BanquetStates.waiting_for_level)
 
-@dp.message(BanquetStates.waiting_for_level)
-async def process_level(message: types.Message, state: FSMContext):
-    level = message.text
-    if level not in ["Можно и по дошику", "Норм по домашнему", "Тяжелый люкс"]:
-        await message.answer("Пожалуйста, выберите вариант из предложенных:")
+@dp.callback_query(F.data.startswith("banquet_level_"), BanquetStates.waiting_for_level)
+async def process_level(call: types.CallbackQuery, state: FSMContext):
+    level_mapping = {
+        "banquet_level_doshik": "Можно и по дошику",
+        "banquet_level_home": "Норм по домашнему",
+        "banquet_level_lux": "Тяжелый люкс"
+    }
+    
+    level = level_mapping.get(call.data)
+    if not level:
+        await call.answer("Неизвестный уровень сложности")
         return
     
     data = await state.get_data()
     guests_count = data['guests_count']
     
-    # Отправляем результат пользователю
-    await message.answer_photo(
+    # Редактируем сообщение с кнопками, убирая их
+    await call.message.edit_reply_markup(reply_markup=None)
+    
+    # Отправляем результат
+    await call.message.answer_photo(
         FSInputFile(PHOTOS_DIR / 'banquet.jpg'),
         caption=f"Банкет на {guests_count} гостей!\nУровень: {level}",
         reply_markup=InlineKeyboardBuilder()
@@ -558,7 +646,6 @@ async def process_level(message: types.Message, state: FSMContext):
     
     # Уведомление админу
     if ADMIN_ID:
-        user = message.from_user
         await bot.send_message(
             ADMIN_ID,
             f"🎉 Ахтунг! Банкет!\n\n"
@@ -660,7 +747,8 @@ async def add_to_order(call: types.CallbackQuery):
             active_orders[user_id]['items'][item_id]['count'] += 1
 
         save_db(menu, orders, active_orders)
-        await call.answer(f"✅ {item_data['name']} добавлен в заказ!")
+        # await call.answer(f"✅ {item_data['name']} добавлен в заказ!")
+        await call.answer(f"✅ {item_data['name']} добавлен в заказ!", show_alert=True)
 
     except Exception as e:
         logger.error(f"Ошибка добавления: {str(e)}", exc_info=True)
@@ -761,9 +849,9 @@ async def confirm_order_handler(call: types.CallbackQuery):
     for item_id, item in order['items'].items():
         item_total = item['count'] * item['price']
         total += item_total
-        order_text += f"▪ {item['name']} ×{item['count']} = {item_total}💋\n"
+        order_text += f"▪ {item['name']} ×{item['count']} = {item_total} 💋\n"
     
-    order_text += f"\n*Итого:* {total}💋"
+    order_text += f"\n*Итого:* {total} 💋"
     
     # Клавиатура с подтверждением
     builder = InlineKeyboardBuilder()
@@ -800,9 +888,9 @@ async def final_confirmation(call: types.CallbackQuery):
     for item_id, item in order['items'].items():
         item_total = item['count'] * item['price']
         total += item_total
-        order_text += f"▪ {item['name']} ×{item['count']} = {item_total}💋\n"
+        order_text += f"▪ {item['name']} ×{item['count']} = {item_total} 💋\n"
     
-    order_text += f"\n*Итого:* {total}💋"
+    order_text += f"\n*Итого:* {total} 💋"
     order_id = generate_order_id()
     
     # Сохраняем заказ
@@ -815,11 +903,16 @@ async def final_confirmation(call: types.CallbackQuery):
     active_orders.pop(user_id)
     save_db(menu, orders, active_orders)
     
-    # Уведомление пользователю
-    await call.message.edit_text(
-        "💝 *Заказ оформлен!*\n\n" +
-        order_text +
-        "\n\nШеф-повар уже бежит на кухню...",
+    # Путь к картинке
+    photo_path = PHOTOS_DIR / 'bonapetit.jpg'
+    
+    # Уведомление пользователю с картинкой
+    await call.message.delete()  # Удаляем предыдущее сообщение с кнопками
+    await call.message.answer_photo(
+        FSInputFile(photo_path),
+        caption="💝 *Заказ оформлен!*\n\n" +
+               order_text +
+               "\n\nШеф-повар уже бежит на кухню...",
         parse_mode="Markdown"
     )
     
@@ -1004,7 +1097,7 @@ async def process_item_photo_with_photo(message: types.Message, state: FSMContex
         
         await message.answer_photo(
             photo.file_id,
-            caption=f"✅ {data['name']} добавлено!\nЦена: {data['price']}₽",
+            caption=f"✅ {data['name']} добавлено!\nЦена: {data['price']} 💋",
             reply_markup=ReplyKeyboardRemove()
         )
         await admin_panel(message, state)
@@ -1030,7 +1123,7 @@ async def process_item_photo_without_photo(message: types.Message, state: FSMCon
         save_db(menu, orders, active_orders)
         
         await message.answer(
-            f"✅ {data['name']} добавлено без фото!\nЦена: {data['price']}₽",
+            f"✅ {data['name']} добавлено без фото!\nЦена: {data['price']} 💋",
             reply_markup=ReplyKeyboardRemove()
         )
         await admin_panel(message, state)
@@ -1157,6 +1250,100 @@ async def mark_order_done(call: types.CallbackQuery):
         call.message.text,
         parse_mode="Markdown"
     )
+
+# Обработчик кнопки "Погнали" у админа
+@dp.callback_query(F.data.startswith("outdoor_confirm_"))
+async def outdoor_confirmation(call: types.CallbackQuery):
+    await call.answer()
+    user_id = int(call.data.split('_')[2])
+    
+    try:
+        # Отправляем уведомление пользователю
+        await bot.send_message(
+            user_id,
+            "🎉 Шеф-повар подтвердил - погнали по ресторанам! 🚗💨"
+        )
+        
+        # Обновляем сообщение админу
+        await call.message.edit_text(
+            f"✅ Вы подтвердили поход по ресторанам с пользователем\n"
+            f"{call.message.text}",
+            reply_markup=None
+        )
+    except Exception as e:
+        logger.error(f"Ошибка подтверждения похода по ресторанам: {e}")
+        await call.answer("❌ Не удалось отправить подтверждение")
+
+@dp.callback_query(F.data.startswith("delivery_confirm_"))
+async def confirm_delivery(call: types.CallbackQuery):
+    try:
+        await call.answer()
+        user_id = int(call.data.split('_')[2])
+        
+        # Отправляем уведомление пользователю
+        await bot.send_message(
+            user_id,
+            "🚀 Ура, не готовить!"
+        )
+        
+        # Редактируем сообщение админа
+        await call.message.edit_text(
+            f"✅ Подтверждено: {call.message.text}",
+            reply_markup=None
+        )
+        
+    except Exception as e:
+        logger.error(f"Ошибка подтверждения доставки: {e}")
+        await call.answer("❌ Не удалось отправить подтверждение", show_alert=True)
+
+# Обработчик кнопки подтверждения
+@dp.callback_query(F.data.startswith("compote_confirm_"))
+async def confirm_compote(call: types.CallbackQuery):
+    try:
+        await call.answer()
+        user_id = int(call.data.split('_')[2])
+        
+        # Отправляем уведомление пользователю
+        await bot.send_message(
+            user_id,
+            "🍾 Го квасить! 🍻"
+        )
+        
+        # Обновляем сообщение админа
+        await call.message.edit_text(
+            f"✅ Подтверждено: {call.message.text}\n"
+            f"Ответ отправлен пользователю",
+            reply_markup=None
+        )
+        
+    except Exception as e:
+        logger.error(f"Ошибка подтверждения: {e}")
+        await call.answer("❌ Не удалось отправить подтверждение", show_alert=True)
+
+# Общий обработчик подтверждения для бичи-меню
+@dp.callback_query(F.data.startswith("bichis_confirm_"))
+async def confirm_bichis(call: types.CallbackQuery):
+    try:
+        await call.answer()
+        _, _, user_id, item_type = call.data.split('_')
+        user_id = int(user_id)
+        
+        # Отправляем уведомление пользователю
+        await bot.send_message(
+            user_id,
+            "🚀 Сифоооон! " + ("Шавуха уже в пути!" if item_type == "shawarma" else "Дошик замачивается!")
+        )
+        
+        # Обновляем сообщение админа
+        await call.message.edit_text(
+            f"✅ Подтверждено: {call.message.text}\n"
+            f"Тип: {'Шаурма' if item_type == 'shawarma' else 'Дошик'}",
+            reply_markup=None
+        )
+        
+    except Exception as e:
+        logger.error(f"Ошибка подтверждения: {e}")
+        await call.answer("❌ Не удалось отправить подтверждение", show_alert=True)
 
 # ====================== ЗАПУСК БОТА ======================
 
